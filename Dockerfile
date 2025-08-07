@@ -1,18 +1,24 @@
-FROM golang:1.23.4-alpine AS builder
+FROM golang:1.24.1-alpine AS builder
 
-WORKDIR /src
+WORKDIR /app
 
-RUN apk update && apk add --no-cache git
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
-
-RUN go mod download
-RUN go build -o -p /src/p2p-matchmaking main.go
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /p2p-matchmaking ./main.go
 
 FROM alpine:latest
 
+# Slack webhook
+RUN apk --no-cache add ca-certificates
+
 WORKDIR /
 
-COPY --from=builder /src/p2p-matchmaking /usr/local/bin/p2p-matchmaking
+COPY --from=builder /p2p-matchmaking /p2p-matchmaking
 
-ENTRYPOINT ["/usr/local/bin/p2p-matchmaking"]
+EXPOSE 8000
+
+ENV SLACK_WEBHOOK_ENDPOINT=""
+
+ENTRYPOINT ["/p2p-matchmaking"]
